@@ -1,0 +1,266 @@
+<!DOCTYPE1 html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Model Interaktif 3D Membran Sel</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #1a1a1a;
+      color: #fff;
+    }
+    #canvas-container {
+      width: 100vw;
+      height: 100vh;
+    }
+    #ui-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 20px;
+      border-radius: 12px;
+      max-width: 320px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    h2 {
+      margin-top: 0;
+      font-size: 1.2rem;
+      color: #4fc3f7;
+    }
+    p {
+      font-size: 0.9rem;
+      line-height: 1.4;
+      color: #ddd;
+    }
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 15px;
+    }
+    button {
+      background: #2c3e50;
+      border: 1px solid #34495e;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: all 0.2s ease;
+    }
+    button:hover {
+      background: #3498db;
+    }
+    #info-card {
+      margin-top: 15px;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      border-left: 4px solid #3498db;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="ui-panel">
+    <h2>Struktur Membran Sel</h2>
+    <p>Gunakan mouse untuk memutar, menggeser, atau memperbesar model 3D.</p>
+    
+    <div class="btn-group">
+      <button onclick="highlight('all')">Lihat Semua</button>
+      <button onclick="highlight('integral')">Protein Integral (Y)</button>
+      <button onclick="highlight('bilayer')">Fosfolipid Bilayer</button>
+      <button onclick="highlight('glyco')">Glikoprotein & Glikolipid</button>
+      <button onclick="highlight('perifer')">Protein Perifer</button>
+    </div>
+
+    <div id="info-card">
+      <strong id="info-title">Protein Integral (Huruf Y)</strong>
+      <p id="info-body">Protein yang menembus seluruh lapisan fosfolipid bilayer. Berfungsi sebagai saluran transportasi molekul/zat masuk dan keluar sel.</p>
+    </div>
+  </div>
+
+  <div id="canvas-container"></div>
+
+  <!-- Three.js & OrbitControls CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+  <script>
+    // 1. Setup Scene, Camera, Renderer
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x121212);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 15, 25);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.shadowMap.enabled = true;
+    container.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+
+    // 2. Pencahayaan
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(10, 20, 15);
+    scene.add(dirLight);
+
+    // Group Penampung Struktur
+    const membraneGroup = new THREE.Group();
+    const lipidGroup = new THREE.Group();
+    const proteinIntegralGroup = new THREE.Group();
+    const carbohydrateGroup = new THREE.Group();
+    const peripheralGroup = new THREE.Group();
+
+    // Material
+    const headMat = new THREE.MeshStandardMaterial({ color: 0xe91e63, roughness: 0.3 }); // Merah Muda
+    const tailMat = new THREE.MeshStandardMaterial({ color: 0x26a69a, roughness: 0.5 }); // Hijau Toska
+    const integralMat = new THREE.MeshStandardMaterial({ color: 0x8e44ad, roughness: 0.2 }); // Ungu (Y)
+    const carbMat = new THREE.MeshStandardMaterial({ color: 0x2ecc71, roughness: 0.3 }); // Hijau
+    const periferMat = new THREE.MeshStandardMaterial({ color: 0x3498db, roughness: 0.3 }); // Biru
+
+    // 3. Membuat Fosfolipid Bilayer
+    const headGeo = new THREE.SphereGeometry(0.35, 16, 16);
+    const tailGeo = new THREE.CylinderGeometry(0.05, 0.05, 1.2, 8);
+
+    for (let x = -8; x <= 8; x += 0.9) {
+      for (let z = -4; z <= 4; z += 0.9) {
+        // Abaikan area tengah tempat Protein Integral (Y) berada
+        if (Math.abs(x) < 1.5 && Math.abs(z) < 1.5) continue;
+
+        // Layer Atas
+        const headTop = new THREE.Mesh(headGeo, headMat);
+        headTop.position.set(x, 1.5, z);
+        lipidGroup.add(headTop);
+
+        const tailTop = new THREE.Mesh(tailGeo, tailMat);
+        tailTop.position.set(x, 0.8, z);
+        lipidGroup.add(tailTop);
+
+        // Layer Bawah
+        const headBottom = new THREE.Mesh(headGeo, headMat);
+        headBottom.position.set(x, -1.5, z);
+        lipidGroup.add(headBottom);
+
+        const tailBottom = new THREE.Mesh(tailGeo, tailMat);
+        tailBottom.position.set(x, -0.8, z);
+        lipidGroup.add(tailBottom);
+      }
+    }
+
+    // 4. Membuat Protein Integral (Y) di Tengah dengan Saluran Transportasi
+    const outerShape = new THREE.CylinderGeometry(1.2, 1.2, 3.8, 32);
+    const innerTunnel = new THREE.CylinderGeometry(0.4, 0.4, 4, 32);
+    
+    // Protein Integral Saluran (Warna Ungu)
+    const integralMesh = new THREE.Mesh(outerShape, integralMat);
+    const tunnelMesh = new THREE.Mesh(innerTunnel, new THREE.MeshBasicMaterial({ color: 0x000000 }));
+    integralMesh.position.set(0, 0, 0);
+    tunnelMesh.position.set(0, 0, 0);
+    
+    proteinIntegralGroup.add(integralMesh);
+
+    // 5. Glikoprotein / Glikolipid (Karbohidrat Bercabang)
+    function createChain(x, y, z) {
+      const chain = new THREE.Group();
+      for (let i = 0; i < 4; i++) {
+        const node = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 12), carbMat);
+        node.position.set(x + (i * 0.25), y + (i * 0.3), z);
+        chain.add(node);
+      }
+      return chain;
+    }
+    carbohydrateGroup.add(createChain(0, 2.0, 0)); // Di atas protein integral
+    carbohydrateGroup.add(createChain(3, 1.8, 2)); // Di atas kepala fosfolipid
+
+    // 6. Protein Perifer
+    const periferMesh = new THREE.Mesh(new THREE.SphereGeometry(0.9, 32, 32), periferMat);
+    periferMesh.position.set(3, -1.8, 1);
+    peripheralGroup.add(periferMesh);
+
+    // Gabungkan ke Utama
+    membraneGroup.add(lipidGroup);
+    membraneGroup.add(proteinIntegralGroup);
+    membraneGroup.add(carbohydrateGroup);
+    membraneGroup.add(peripheralGroup);
+    scene.add(membraneGroup);
+
+    // 7. Interaktivitas & Highlight
+    const infoTitle = document.getElementById('info-title');
+    const infoBody = document.getElementById('info-body');
+
+    function setOpacity(group, opacity) {
+      group.traverse((child) => {
+        if (child.isMesh) {
+          child.material.transparent = opacity < 1.0;
+          child.material.opacity = opacity;
+        }
+      });
+    }
+
+    window.highlight = function(type) {
+      // Reset Opacity
+      setOpacity(lipidGroup, 1.0);
+      setOpacity(proteinIntegralGroup, 1.0);
+      setOpacity(carbohydrateGroup, 1.0);
+      setOpacity(peripheralGroup, 1.0);
+
+      if (type === 'integral') {
+        setOpacity(lipidGroup, 0.2);
+        setOpacity(carbohydrateGroup, 0.2);
+        setOpacity(peripheralGroup, 0.2);
+        infoTitle.innerText = "Protein Integral (Huruf Y)";
+        infoBody.innerText = "Protein yang menembus seluruh lapisan bilayer fosfolipid. Berfungsi sebagai saluran transportasi molekul/zat masuk dan keluar sel.";
+      } else if (type === 'bilayer') {
+        setOpacity(proteinIntegralGroup, 0.2);
+        setOpacity(carbohydrateGroup, 0.2);
+        setOpacity(peripheralGroup, 0.2);
+        infoTitle.innerText = "Fosfolipid Bilayer";
+        infoBody.innerText = "Lapisan ganda lemak yang terdiri dari kepala hidrofilik (suka air) warna merah dan ekor hidrofobik (takut air) warna hijau.";
+      } else if (type === 'glyco') {
+        setOpacity(lipidGroup, 0.2);
+        setOpacity(proteinIntegralGroup, 0.2);
+        setOpacity(peripheralGroup, 0.2);
+        infoTitle.innerText = "Glikoprotein & Glikolipid";
+        infoBody.innerText = "Rantai karbohidrat cabang (hijau) yang menempel pada protein atau lipid. Berfungsi dalam pengenalan sel dan komunikasi antar sel.";
+      } else if (type === 'perifer') {
+        setOpacity(lipidGroup, 0.2);
+        setOpacity(proteinIntegralGroup, 0.2);
+        setOpacity(carbohydrateGroup, 0.2);
+        infoTitle.innerText = "Protein Perifer";
+        infoBody.innerText = "Protein yang hanya menempel pada permukaan luar/dalam membran (biru). Berfungsi sebagai enzim atau penunjang struktur sel.";
+      } else {
+        infoTitle.innerText = "Struktur Utama Membran Sel";
+        infoBody.innerText = "Pilih salah satu komponen di atas untuk melihat detail fungsinya.";
+      }
+    };
+
+    // Responsive Resize
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Animation Loop
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>
